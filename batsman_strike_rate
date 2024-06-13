@@ -1,0 +1,35 @@
+from pyspark.sql.types import StructField, StructType, IntegerType, BooleanType, StringType, DateType, DecimalType
+from pyspark.sql.functions import col, when, sum, avg, row_number, countDistinct, count, format_number
+from pyspark.sql.window import Window
+from pyspark.sql import SparkSession
+
+#create session
+spark = SparkSession.builder.appName("ipl 2024 data analytics").getOrCreate()
+
+#Valid balls faced by batsman
+valid_df = ball_by_ball_df.filter((col("wide") == 0) & (col("noballs") == 0))
+
+#Calc total matches played, total runs & balls faced by a batsman
+batsman_runs_df = valid_df.groupBy("striker","batting_team").agg(
+    sum(col("runs_of_bat")).alias("total_runs_scored"),
+    countDistinct(col("match_id")).alias("matches_played"),
+    count(col("runs_of_bat")).alias("balls_faced")
+    )
+
+#Calc strike rate of each batsman
+batsman_strikerate_df = batsman_runs_df.withColumn(
+    "strike_rate",
+    (col("total_runs_scored")/col("balls_faced"))*100
+)
+
+#formatting the strike rate (decimal) by 2 
+batsman_strikerate_df = batsman_strikerate_df.withColumn(
+    "strike_rate",
+    format_number(col("strike_rate"),2)
+)
+#Sort the total batsman runs from highest
+batsman_strikerate_df = batsman_strikerate_df.select("striker","batting_team","matches_played","total_runs_scored","strike_rate")\
+    .orderBy(col("total_runs_scored").desc())
+
+#Finalized total_runs, matches_played, ball_faced, strike_rate by batsman
+batsman_strikerate_df.show(10)
